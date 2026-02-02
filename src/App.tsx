@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import ReactMarkdown from 'react-markdown';
 import Editor, { OnMount } from "@monaco-editor/react";
 import { writeTextFile, readTextFile, BaseDirectory, exists } from '@tauri-apps/plugin-fs';
 
@@ -72,8 +73,15 @@ function App() {
   };
 
   const handleSaveSnippet = () => {
-    if (!title || !code) {
-        setStatus("⚠️ Title & Code required!");
+    if (!title.trim()) {
+        alert("Judul snippet tidak boleh kosong! Silakan isi judul terlebih dahulu.");
+        setStatus("⚠️ Title is required!");
+        return;
+    }
+
+    if (!code.trim()) {
+        alert("Editor kode masih kosong! Silakan tulis kode terlebih dahulu.");
+        setStatus("⚠️ Code is required!");
         return;
     }
 
@@ -408,8 +416,33 @@ function App() {
                         <button onClick={() => {setAiResponse(""); setSuggestedCode("");}} className="text-[10px] text-slate-400 hover:text-white transition-colors">Dismiss</button>
                     </div>
                 </div>
-                <div className="text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed max-h-40 overflow-y-auto custom-scrollbar">
-                    {aiResponse}
+                <div className="text-sm text-slate-300 leading-relaxed max-h-60 overflow-y-auto custom-scrollbar p-2">
+                    <ReactMarkdown
+                        components={{
+                            code({node, inline, className, children, ...props}: any) {
+                                const match = /language-(\w+)/.exec(className || '')
+                                return !inline && match ? (
+                                    <div className="rounded-md overflow-hidden my-2 border border-slate-700 shadow-sm">
+                                        <SyntaxHighlighter
+                                            style={vscDarkPlus}
+                                            language={match[1]}
+                                            PreTag="div"
+                                            customStyle={{ margin: 0, padding: '1rem', fontSize: '0.8rem' }}
+                                            {...props}
+                                        >
+                                            {String(children).replace(/\n$/, '')}
+                                        </SyntaxHighlighter>
+                                    </div>
+                                ) : (
+                                    <code className="bg-slate-700/50 text-indigo-300 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
+                                        {children}
+                                    </code>
+                                )
+                            }
+                        }}
+                    >
+                        {aiResponse}
+                    </ReactMarkdown>
                 </div>
             </div>
           )}
