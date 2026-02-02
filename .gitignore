@@ -1,0 +1,10 @@
+node_modules
+target
+src-tauri/target
+dist
+.DS_Store
+.vs
+*.sln
+*.suo
+.vscode
+devmind_data.json
