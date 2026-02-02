@@ -50,9 +50,9 @@ function App() {
             tags: item.tags || []
           }));
           setSnippets(migratedData);
-          setStatus("Data loaded");
+          setStatus("System Ready");
         } else {
-            setStatus("Ready");
+            setStatus("System Ready");
         }
       } catch (err) {
         setStatus("Error loading data");
@@ -67,13 +67,13 @@ function App() {
         baseDir: BaseDirectory.Document
       });
     } catch (err) {
-      setStatus("Failed to save");
+      setStatus("Failed to save to disk");
     }
   };
 
   const handleSaveSnippet = () => {
     if (!title || !code) {
-        setStatus("Title & Code required!");
+        setStatus("⚠️ Title & Code required!");
         return;
     }
 
@@ -90,7 +90,7 @@ function App() {
                 ? { ...s, title, code, language, tags: processedTags }
                 : s
         );
-        setStatus("Updated! ✅");
+        setStatus("Snippet Updated Successfully");
         setEditingId(null);
     } else {
         const newSnippet: Snippet = {
@@ -101,7 +101,7 @@ function App() {
             tags: processedTags
         };
         updatedSnippets = [newSnippet, ...snippets];
-        setStatus("Saved! 💾");
+        setStatus("Snippet Saved Successfully");
     }
 
     setSnippets(updatedSnippets);
@@ -120,7 +120,6 @@ function App() {
     setTagsInput(snippet.tags.join(", "));
     setEditingId(snippet.id);
     setStatus(`Editing: ${snippet.title}`);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const cancelEdit = () => {
@@ -128,44 +127,44 @@ function App() {
     setCode("");
     setTagsInput("");
     setEditingId(null);
-    setStatus("Cancelled");
+    setStatus("Edit Cancelled");
   };
 
   const deleteSnippet = (id: number) => {
-    if (window.confirm("Hapus snippet ini?")) {
+    if (window.confirm("Are you sure you want to delete this snippet?")) {
         const updatedSnippets = snippets.filter((s) => s.id !== id);
         setSnippets(updatedSnippets);
         saveDataToDisk(updatedSnippets);
         if (editingId === id) cancelEdit();
-        setStatus("Deleted 🗑️");
+        setStatus("Snippet Deleted");
     }
   };
 
   const copyToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text);
-    setStatus("Copied! 📋");
+    setStatus("Copied to clipboard! 📋");
     setTimeout(() => setStatus("Ready"), 1500);
   };
 
   const askAI = async (mode: 'explain' | 'refactor') => {
     if (!apiKey) {
       setShowAiConfig(true);
-      return alert("Set API Key dulu!");
+      return alert("Please configure API Key first.");
     }
-    if (!code) return alert("Kode kosong!");
+    if (!code) return alert("Code editor is empty.");
 
     setIsAiLoading(true);
     setAiResponse("");
     setSuggestedCode("");
-    setStatus(mode === 'refactor' ? "AI Fixing..." : "AI Explaining...");
+    setStatus(mode === 'refactor' ? "AI is fixing code..." : "AI is analyzing...");
 
     try {
       const cleanBaseUrl = baseUrl.replace(/\/+$/, "");
       const ENDPOINT = `${cleanBaseUrl}/chat/completions`;
 
       const systemPrompt = mode === 'refactor'
-        ? "Kamu adalah Senior Developer. Perbaiki, optimasi, dan rapikan kode berikut. BERIKAN HANYA KODE HASIL PERBAIKAN DALAM FORMAT MARKDOWN CODE BLOCK."
-        : "Jelaskan kode berikut secara singkat. Jika ada error, sebutkan.";
+        ? "You are a Senior Developer. Fix, optimize, and refactor the following code. RETURN ONLY THE FIXED CODE INSIDE A MARKDOWN CODE BLOCK."
+        : "Explain the following code briefly. Mention potential bugs if any.";
 
       const response = await fetch(ENDPOINT, {
         method: "POST",
@@ -177,7 +176,7 @@ function App() {
           model: "gpt-4o-mini",
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: `Bahasa: ${language}\n\nKode:\n${code}` }
+            { role: "user", content: `Language: ${language}\n\nCode:\n${code}` }
           ],
           temperature: 0.5,
         })
@@ -185,12 +184,12 @@ function App() {
 
       const data = await response.json();
 
-      if (!response.ok) throw new Error(data.error?.message || "Gagal");
+      if (!response.ok) throw new Error(data.error?.message || "Failed to fetch AI response");
 
       if (data.choices && data.choices.length > 0) {
         const content = data.choices[0].message.content;
         setAiResponse(content);
-        setStatus("AI Done");
+        setStatus("AI Task Completed");
 
         if (mode === 'refactor') {
             const codeBlockRegex = /```(?:[\w]*\n)?([\s\S]*?)```/;
@@ -201,7 +200,7 @@ function App() {
         }
 
       } else {
-        setAiResponse("Tidak ada respons.");
+        setAiResponse("No response from AI.");
       }
 
     } catch (error: any) {
@@ -215,7 +214,7 @@ function App() {
     if (suggestedCode) {
         setCode(suggestedCode);
         setSuggestedCode("");
-        setStatus("Code Applied! ✨");
+        setStatus("AI Fix Applied ✨");
     }
   };
 
@@ -228,60 +227,100 @@ function App() {
   });
 
   return (
-    <div className="h-screen w-full bg-[#1e1e1e] text-white flex flex-col p-4 overflow-hidden font-sans">
-      <header className="mb-4 border-b border-gray-700 pb-3 flex justify-between items-center">
+    <div className="h-screen w-full bg-[#0f1117] flex flex-col font-sans overflow-hidden text-slate-300 selection:bg-indigo-500/30">
+      
+      {/* HEADER */}
+      <header className="h-16 shrink-0 border-b border-white/5 bg-[#0f1117]/80 backdrop-blur-xl flex justify-between items-center px-6 z-20 relative">
+        <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <span className="text-lg font-bold text-white">DM</span>
+            </div>
+            <div>
+                <h1 className="text-lg font-bold text-white tracking-tight leading-none">
+                    DevMind <span className="text-indigo-400 font-light">Pro</span>
+                </h1>
+                <p className="text-[10px] text-slate-500 font-mono tracking-wider uppercase">Code Manager & AI Assistant</p>
+            </div>
+        </div>
+
         <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-blue-500 tracking-tight">
-            DevMind <span className="text-gray-500 text-sm font-normal">v2.0 Pro</span>
-            </h1>
+             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/50 border border-white/5">
+                <span className={`w-2 h-2 rounded-full ${status === 'Error loading data' ? 'bg-red-500' : 'bg-emerald-500'} animate-pulse`}></span>
+                <span className="text-xs text-slate-400 font-mono">{status}</span>
+             </div>
+
             <button
                 onClick={() => setShowAiConfig(!showAiConfig)}
-                className="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded border border-gray-600 transition-colors"
+                className={`text-xs flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all ${showAiConfig ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-300' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
             >
-                ⚙️ {showAiConfig ? "Hide" : "Config"}
+                ⚙️ <span className="hidden sm:inline">AI Config</span>
             </button>
         </div>
-        <span className="text-xs text-gray-400 font-mono bg-gray-800 px-3 py-1 rounded">
-          {status}
-        </span>
       </header>
 
+      {/* AI CONFIG MODAL (POPOVER) */}
       {showAiConfig && (
-        <div className="bg-gray-800 p-3 rounded-lg border border-gray-600 mb-4 flex flex-col gap-2 shadow-lg z-50">
-            <input type="text" placeholder="Base URL" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} className="bg-gray-900 px-2 py-1 rounded text-sm border border-gray-700" />
-            <input type="password" placeholder="API Key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} className="bg-gray-900 px-2 py-1 rounded text-sm border border-gray-700" />
+        <div className="absolute top-20 right-6 w-80 bg-[#1e293b] p-4 rounded-xl border border-slate-600/50 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
+            <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">🤖 AI Configuration</h3>
+            <div className="space-y-3">
+                <div className="space-y-1">
+                    <label className="text-xs text-slate-400">Base URL</label>
+                    <input type="text" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} className="input-field w-full text-xs" />
+                </div>
+                <div className="space-y-1">
+                    <label className="text-xs text-slate-400">API Key</label>
+                    <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} className="input-field w-full text-xs" />
+                </div>
+                <p className="text-[10px] text-slate-500 italic">Compatible with OpenAI & DeepSeek formats.</p>
+            </div>
         </div>
       )}
 
-      <div className="flex-1 grid grid-cols-12 gap-4 h-full overflow-hidden">
-        <div className="col-span-7 flex flex-col gap-3 h-full overflow-hidden">
-          <div className="flex gap-2">
-            <input
-                type="text" placeholder="Judul Snippet"
-                className="bg-gray-800 p-2.5 rounded border border-gray-700 focus:border-blue-500 flex-1 outline-none text-sm"
-                value={title} onChange={(e) => setTitle(e.target.value)}
-            />
-            <select
-                className="bg-gray-800 p-2.5 rounded border border-gray-700 focus:border-blue-500 cursor-pointer outline-none text-sm w-32"
-                value={language} onChange={(e) => setLanguage(e.target.value)}
-            >
-                <option value="javascript">JS</option>
-                <option value="typescript">TS</option>
-                <option value="python">Python</option>
-                <option value="html">HTML</option>
-                <option value="css">CSS</option>
-                <option value="sql">SQL</option>
-                <option value="json">JSON</option>
-            </select>
+      {/* MAIN LAYOUT */}
+      <div className="flex-1 flex overflow-hidden">
+        
+        {/* LEFT PANEL: EDITOR */}
+        <div className="flex-1 flex flex-col min-w-0 p-4 gap-4">
+          
+          {/* EDITOR CONTROLS */}
+          <div className="flex gap-3">
+            <div className="flex-1 relative group">
+                <input
+                    type="text" 
+                    placeholder="Snippet Title..."
+                    className="input-field w-full font-bold text-white placeholder:font-normal"
+                    value={title} onChange={(e) => setTitle(e.target.value)}
+                />
+            </div>
+            <div className="w-36">
+                <select
+                    className="input-field w-full cursor-pointer appearance-none bg-no-repeat bg-[right_1rem_center]"
+                    style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")` }}
+                    value={language} onChange={(e) => setLanguage(e.target.value)}
+                >
+                    <option value="javascript">JavaScript</option>
+                    <option value="typescript">TypeScript</option>
+                    <option value="python">Python</option>
+                    <option value="html">HTML</option>
+                    <option value="css">CSS</option>
+                    <option value="sql">SQL</option>
+                    <option value="json">JSON</option>
+                    <option value="rust">Rust</option>
+                </select>
+            </div>
           </div>
 
-          <input
-            type="text" placeholder="Tags (pisahkan koma): react, api, helper..."
-            className="bg-gray-800 p-2.5 rounded border border-gray-700 focus:border-blue-500 outline-none text-sm w-full"
-            value={tagsInput} onChange={(e) => setTagsInput(e.target.value)}
-          />
+          <div className="relative">
+             <span className="absolute left-3 top-2.5 text-slate-500 text-xs select-none">#</span>
+             <input
+                type="text" placeholder="Tags: react, api, utils..."
+                className="input-field w-full pl-7"
+                value={tagsInput} onChange={(e) => setTagsInput(e.target.value)}
+            />
+          </div>
 
-          <div className={`flex-1 rounded-lg overflow-hidden border ${editingId ? 'border-yellow-500' : 'border-gray-700'}`}>
+          {/* MONACO EDITOR CONTAINER */}
+          <div className={`flex-1 rounded-xl overflow-hidden border shadow-2xl relative group transition-all duration-300 ${editingId ? 'border-amber-500/50 shadow-amber-900/10' : 'border-slate-800 shadow-black/40'}`}>
             <Editor
                 height="100%"
                 defaultLanguage="javascript"
@@ -293,117 +332,169 @@ function App() {
                 options={{
                     minimap: { enabled: false },
                     fontSize: 14,
+                    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                    fontLigatures: true,
+                    lineHeight: 24,
                     scrollBeyondLastLine: false,
                     automaticLayout: true,
-                    padding: { top: 16, bottom: 16 }
+                    padding: { top: 20, bottom: 20 },
+                    smoothScrolling: true,
+                    cursorBlinking: "smooth",
+                    renderLineHighlight: "all",
                 }}
             />
+            {/* Overlay hint if empty */}
+            {!code && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-20">
+                    <span className="text-4xl font-bold text-slate-600">Start Coding</span>
+                </div>
+            )}
           </div>
 
-          <div className="flex gap-2">
+          {/* ACTION BAR */}
+          <div className="flex gap-3 items-center">
             {editingId && (
-                <button onClick={cancelEdit} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm font-bold">Batal</button>
+                <button onClick={cancelEdit} className="btn-secondary">
+                    Cancel
+                </button>
             )}
             <button
                 onClick={handleSaveSnippet}
-                className={`flex-1 py-2 rounded text-sm font-bold transition-colors ${editingId ? "bg-yellow-600 hover:bg-yellow-700" : "bg-blue-600 hover:bg-blue-700"}`}
+                className={`flex-1 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg ${
+                    editingId 
+                    ? "bg-amber-600 hover:bg-amber-500 text-white shadow-amber-900/20" 
+                    : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/20"
+                }`}
             >
-                {editingId ? "Update" : "Simpan"}
+                {editingId ? "Update Changes" : "Save Snippet"}
             </button>
 
-            <div className="flex gap-1 bg-gray-800 p-1 rounded border border-gray-700">
+            <div className="h-8 w-[1px] bg-white/10 mx-1"></div>
+
+            <div className="flex gap-2">
                 <button
                     onClick={() => askAI('explain')}
                     disabled={isAiLoading}
-                    className="px-3 py-1 bg-purple-900/50 hover:bg-purple-800 text-purple-200 text-xs rounded border border-purple-700 transition-colors"
+                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 text-sm font-medium transition-all disabled:opacity-50"
                 >
-                    {isAiLoading ? "..." : "Explain"}
+                    {isAiLoading ? "Thinking..." : "🧠 Explain"}
                 </button>
                 <button
                     onClick={() => askAI('refactor')}
                     disabled={isAiLoading}
-                    className="px-3 py-1 bg-green-900/50 hover:bg-green-800 text-green-200 text-xs rounded border border-green-700 transition-colors"
+                    className="px-4 py-2.5 bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-400 border border-emerald-800/50 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
                 >
-                    {isAiLoading ? "..." : "Fix & Refactor"}
+                    {isAiLoading ? "Working..." : "✨ Fix & Refactor"}
                 </button>
             </div>
           </div>
 
+          {/* AI PANEL */}
           {(aiResponse || suggestedCode) && (
-            <div className="bg-gray-800 p-3 rounded-lg border border-gray-600 max-h-48 overflow-y-auto custom-scrollbar flex flex-col gap-2">
-                <div className="flex justify-between items-start">
-                    <span className="text-xs font-bold text-gray-400">AI Response:</span>
+            <div className="bg-slate-900/90 p-4 rounded-xl border border-indigo-500/30 shadow-2xl flex flex-col gap-3 animate-in slide-in-from-bottom-5">
+                <div className="flex justify-between items-start border-b border-white/5 pb-2">
+                    <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                        ✦ AI Insight
+                    </span>
                     <div className="flex gap-2">
                         {suggestedCode && (
                             <button
                                 onClick={applyAiFix}
-                                className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded flex items-center gap-1"
+                                className="text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded transition-colors font-bold"
                             >
-                                ✅ Apply Code
+                                ✓ Apply Fix
                             </button>
                         )}
-                        <button onClick={() => {setAiResponse(""); setSuggestedCode("");}} className="text-xs text-red-400 hover:text-red-300">Close</button>
+                        <button onClick={() => {setAiResponse(""); setSuggestedCode("");}} className="text-[10px] text-slate-400 hover:text-white transition-colors">Dismiss</button>
                     </div>
                 </div>
-                <div className="text-sm text-gray-300 whitespace-pre-wrap font-mono leading-relaxed">
+                <div className="text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed max-h-40 overflow-y-auto custom-scrollbar">
                     {aiResponse}
                 </div>
             </div>
           )}
         </div>
 
-        <div className="col-span-5 flex flex-col gap-3 h-full overflow-hidden">
-          <div className="relative">
-            <span className="absolute left-3 top-2.5 text-gray-400 text-sm">🔍</span>
-            <input
-              type="text" placeholder="Cari kode, judul, atau #tag..."
-              className="w-full bg-gray-800 border border-gray-700 text-white pl-9 pr-3 py-2 rounded outline-none focus:border-blue-500 text-sm"
-              value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            />
+        {/* RIGHT PANEL: LIBRARY */}
+        <div className="w-[400px] bg-[#13151c] border-l border-white/5 flex flex-col shrink-0">
+          <div className="p-4 border-b border-white/5 bg-[#13151c]/95 backdrop-blur z-10">
+            <div className="relative group">
+                <span className="absolute left-3 top-2.5 text-slate-500 group-focus-within:text-indigo-400 transition-colors">🔍</span>
+                <input
+                    type="text" placeholder="Search snippets..."
+                    className="w-full bg-[#0f1117] border border-slate-800 text-slate-200 pl-9 pr-3 py-2 rounded-lg outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 text-sm transition-all"
+                    value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar flex flex-col gap-3">
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar">
             {filteredSnippets.length === 0 ? (
-              <p className="text-center text-gray-500 text-sm mt-10 italic">Tidak ditemukan.</p>
+              <div className="flex flex-col items-center justify-center h-40 text-slate-600">
+                <span className="text-2xl mb-2">🔭</span>
+                <p className="text-sm">No snippets found.</p>
+              </div>
             ) : (
               filteredSnippets.map((item) => (
-                <div key={item.id} className={`bg-[#252526] rounded-lg border overflow-hidden shadow-sm group hover:border-blue-500/50 transition-all ${editingId === item.id ? "border-yellow-500 ring-1 ring-yellow-500/30" : "border-gray-700"}`}>
-                  <div className="px-3 py-2 border-b border-gray-700/50 flex justify-between items-start bg-[#2d2d2d]">
+                <div 
+                    key={item.id} 
+                    className={`group bg-[#1e293b]/40 rounded-xl border transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5
+                    ${editingId === item.id 
+                        ? "border-amber-500/50 bg-amber-900/5 ring-1 ring-amber-500/20" 
+                        : "border-white/5 hover:border-indigo-500/30 hover:bg-[#1e293b]/80"
+                    }`}
+                >
+                  {/* Card Header */}
+                  <div className="px-3 py-2.5 flex justify-between items-start">
                     <div className="overflow-hidden mr-2">
-                        <h3 className="font-bold text-blue-400 text-sm truncate mb-1">{item.title}</h3>
-                        <div className="flex flex-wrap gap-1">
-                            <span className="text-[10px] bg-gray-700 text-gray-300 px-1.5 rounded border border-gray-600">{item.language}</span>
+                        <h3 className={`font-bold text-sm truncate mb-1.5 ${editingId === item.id ? 'text-amber-400' : 'text-slate-200 group-hover:text-white'}`}>
+                            {item.title}
+                        </h3>
+                        <div className="flex flex-wrap gap-1.5">
+                            <span className="text-[10px] font-mono bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">{item.language}</span>
                             {item.tags.map((tag, idx) => (
-                                <span key={idx} className="text-[10px] bg-blue-900/30 text-blue-300 px-1.5 rounded border border-blue-800/50">
+                                <span key={idx} className="text-[10px] bg-indigo-500/10 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/20">
                                     #{tag}
                                 </span>
                             ))}
                         </div>
                     </div>
 
-                    <div className="flex gap-1 shrink-0">
-                      <button onClick={() => startEdit(item)} className="p-1.5 hover:bg-gray-600 rounded text-gray-400 hover:text-yellow-400">✏️</button>
-                      <button onClick={() => copyToClipboard(item.code)} className="p-1.5 hover:bg-gray-600 rounded text-gray-400 hover:text-green-400">📋</button>
-                      <button onClick={() => deleteSnippet(item.id)} className="p-1.5 hover:bg-gray-600 rounded text-gray-400 hover:text-red-400">🗑️</button>
+                    {/* Quick Actions (Visible on Hover) */}
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => startEdit(item)} className="p-1.5 hover:bg-slate-700 rounded-md text-slate-400 hover:text-amber-400 transition-colors" title="Edit">✏️</button>
+                      <button onClick={() => copyToClipboard(item.code)} className="p-1.5 hover:bg-slate-700 rounded-md text-slate-400 hover:text-emerald-400 transition-colors" title="Copy">📋</button>
+                      <button onClick={() => deleteSnippet(item.id)} className="p-1.5 hover:bg-slate-700 rounded-md text-slate-400 hover:text-red-400 transition-colors" title="Delete">🗑️</button>
                     </div>
                   </div>
 
-                  <div className="max-h-32 overflow-hidden relative">
+                  {/* Code Preview */}
+                  <div 
+                    className="max-h-24 overflow-hidden relative bg-[#0f1117]/50 border-t border-white/5 cursor-pointer"
+                    onClick={() => startEdit(item)}
+                  >
                     <SyntaxHighlighter
                         language={item.language}
                         style={vscDarkPlus}
-                        customStyle={{ margin: 0, padding: '0.75rem', fontSize: '0.75rem', background: 'transparent' }}
+                        customStyle={{ 
+                            margin: 0, 
+                            padding: '0.75rem', 
+                            fontSize: '0.7rem', 
+                            lineHeight: '1.4',
+                            background: 'transparent',
+                            pointerEvents: 'none'
+                        }}
                     >
                         {item.code}
                     </SyntaxHighlighter>
-                    <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[#252526] to-transparent pointer-events-none"></div>
+                    {/* Fade Out Gradient */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#1e293b] via-transparent to-transparent pointer-events-none opacity-80"></div>
                   </div>
                 </div>
               ))
             )}
           </div>
         </div>
-
       </div>
     </div>
   );
