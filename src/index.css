@@ -14,7 +14,6 @@ body {
     overflow: hidden;
 }
 
-/* Custom Scrollbar - Minimalis */
 ::-webkit-scrollbar {
     width: 5px;
     height: 5px;
@@ -29,7 +28,6 @@ body {
 }
 
 @layer utilities {
-    /* Glass Effect yang lebih modern */
     .glass-sidebar {
         @apply bg-[#09090b]/95 backdrop-blur-xl border-r border-white/[0.08];
     }
@@ -38,7 +36,6 @@ body {
         @apply bg-zinc-900/50 backdrop-blur-md border border-white/[0.08];
     }
 
-    /* Input Style modern tanpa border tebal */
     .input-modern {
         @apply bg-transparent border border-transparent focus:border-indigo-500/50 text-zinc-200 placeholder-zinc-600 outline-none transition-all duration-200 rounded-md px-3 py-1.5 text-sm hover:bg-zinc-800/50 focus:bg-zinc-900;
     }

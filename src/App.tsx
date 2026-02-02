@@ -5,7 +5,6 @@ import ReactMarkdown from 'react-markdown';
 import Editor, { OnMount } from "@monaco-editor/react";
 import { writeTextFile, readTextFile, BaseDirectory, exists } from '@tauri-apps/plugin-fs';
 
-// --- Types ---
 interface Snippet {
   id: number;
   title: string;
@@ -16,8 +15,8 @@ interface Snippet {
 
 const FILE_NAME = 'devmind_data.json';
 
-// --- Icons Components (Inline SVG for sleek look without deps) ---
 const Icons = {
+  Close: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
   Search: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
   Plus: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
   Save: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
@@ -35,6 +34,45 @@ const Icons = {
   )
 };
 
+const MarkdownComponents: any = {
+  h1: ({node, ...props}: any) => <h1 className="text-xl font-bold text-indigo-400 mt-6 mb-3 pb-2 border-b border-zinc-800" {...props} />,
+  h2: ({node, ...props}: any) => <h2 className="text-lg font-bold text-zinc-200 mt-5 mb-2" {...props} />,
+  h3: ({node, ...props}: any) => <h3 className="text-base font-semibold text-indigo-300 mt-4 mb-2" {...props} />,
+
+  p: ({node, ...props}: any) => <p className="mb-3 text-zinc-300 leading-relaxed text-[13px]" {...props} />,
+
+  ul: ({node, ...props}: any) => <ul className="list-disc list-outside mb-4 pl-5 text-zinc-300 space-y-1 marker:text-indigo-500" {...props} />,
+  ol: ({node, ...props}: any) => <ol className="list-decimal list-outside mb-4 pl-5 text-zinc-300 space-y-1 marker:text-indigo-500" {...props} />,
+  li: ({node, ...props}: any) => <li className="pl-1" {...props} />,
+
+  blockquote: ({node, ...props}: any) => <blockquote className="border-l-4 border-indigo-500 pl-4 py-1 my-3 bg-zinc-800/50 rounded-r text-zinc-400 italic" {...props} />,
+
+  code({node, inline, className, children, ...props}: any) {
+    const match = /language-(\w+)/.exec(className || '');
+    return !inline && match ? (
+      <div className="rounded-lg overflow-hidden my-3 border border-zinc-700/50 shadow-lg group">
+         <div className="bg-[#1e1e1e] px-3 py-1.5 text-[10px] text-zinc-500 border-b border-zinc-800 flex justify-between items-center font-mono">
+             <span>{match[1]}</span>
+             <span className="opacity-0 group-hover:opacity-100 transition-opacity text-xs">Copy</span>
+         </div>
+        <SyntaxHighlighter
+          style={vscDarkPlus}
+          language={match[1]}
+          PreTag="div"
+          customStyle={{ margin: 0, padding: '1rem', fontSize: '12px', lineHeight: '1.6', backgroundColor: '#1e1e1e' }}
+          {...props}
+        >
+          {String(children).replace(/\n$/, '')}
+        </SyntaxHighlighter>
+      </div>
+    ) : (
+      <code className="bg-zinc-800 text-indigo-200 px-1.5 py-0.5 rounded text-[11px] font-mono border border-zinc-700/50 mx-0.5" {...props}>
+        {children}
+      </code>
+    );
+  }
+};
+
 function App() {
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [title, setTitle] = useState("");
@@ -50,13 +88,38 @@ function App() {
   const [baseUrl, setBaseUrl] = useState("https://ai.sumopod.com/v1");
   const [aiResponse, setAiResponse] = useState("");
   const [suggestedCode, setSuggestedCode] = useState("");
-  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiProcessingState, setAiProcessingState] = useState<'explain' | 'refactor' | null>(null);
   const [showAiConfig, setShowAiConfig] = useState(false);
+  const [lastSelectionRange, setLastSelectionRange] = useState<any>(null);
 
   const editorRef = useRef<any>(null);
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
+  };
+
+  const handleApplyCode = () => {
+    if (!suggestedCode) return;
+
+    if (lastSelectionRange && editorRef.current) {
+        const editor = editorRef.current;
+        const edits = [
+            {
+                range: lastSelectionRange,
+                text: suggestedCode,
+                forceMoveMarkers: true
+            }
+        ];
+        editor.executeEdits("ai-refactor", edits);
+        setStatus("Refactor applied to selection!");
+    } else {
+        setCode(suggestedCode);
+        setStatus("Code applied!");
+    }
+    
+    setSuggestedCode("");
+    setLastSelectionRange(null);
+    setTimeout(() => setStatus("Ready"), 2000);
   };
 
   useEffect(() => {
@@ -68,7 +131,7 @@ function App() {
           const parsedData = JSON.parse(content);
           const migratedData = parsedData.map((item: any) => ({
             ...item,
-            tags: item.tags || []
+            tags: Array.isArray(item.tags) ? item.tags : []
           }));
           setSnippets(migratedData);
           setStatus("System Ready");
@@ -152,13 +215,6 @@ function App() {
     }
   };
 
-  const copyToClipboard = async (text: string, e?: React.MouseEvent) => {
-    if(e) e.stopPropagation();
-    await navigator.clipboard.writeText(text);
-    setStatus("Copied to clipboard!");
-    setTimeout(() => setStatus("Ready"), 1500);
-  };
-
   const askAI = async (mode: 'explain' | 'refactor') => {
     if (!apiKey) {
       setShowAiConfig(true);
@@ -168,23 +224,31 @@ function App() {
     let codeToAnalyze = code;
     const editor = editorRef.current;
     
+    setLastSelectionRange(null); 
+
     if (editor) {
         const selection = editor.getSelection();
         if (selection && !selection.isEmpty()) {
             const selectedText = editor.getModel().getValueInRange(selection);
             if (selectedText.trim().length > 0) {
                 codeToAnalyze = selectedText;
+                setLastSelectionRange(selection); 
             }
         }
     }
 
-    if (!codeToAnalyze.trim()) return;
+    if (!codeToAnalyze.trim()) {
+        setStatus("No code to analyze");
+        return;
+    }
 
-    setIsAiLoading(true);
+    const isSelection = codeToAnalyze.length < code.length;
+    const scopeLabel = isSelection ? "BAGIAN KODE YANG DI-BLOCK (Selected)" : "KESELURUHAN FILE (Full Code)";
+    
+    setAiProcessingState(mode);
     setAiResponse("");
     setSuggestedCode("");
-    const scope = codeToAnalyze.length < code.length ? "Selection" : "File";
-    setStatus(`AI processing (${scope})...`);
+    setStatus(`AI processing (${isSelection ? "Selection" : "File"})...`);
 
     try {
       const cleanBaseUrl = baseUrl.replace(/\/+$/, "");
@@ -193,23 +257,32 @@ function App() {
       let systemPrompt = "";
 
       if (mode === 'refactor') {
-        systemPrompt = "Anda adalah Senior Developer. Tugas anda: 1. Perbaiki dan optimalkan kode yang diberikan. 2. Jawab dalam BAHASA INDONESIA. 3. Berikan kode hasil perbaikan di dalam Markdown Code Block. 4. Berikan penjelasan singkat poin per poin mengapa kode tersebut diubah.";
-      } else {
-        systemPrompt = "Anda adalah Asisten Coding berbahasa Indonesia. Jelaskan kode berikut dalam BAHASA INDONESIA. " +
+        systemPrompt = "Anda adalah Senior Developer (Indonesian). Tugas: 1. Perbaiki/Optimalkan kode. 2. Jawab dalam BAHASA INDONESIA yang profesional. 3. WAJIB Gunakan Markdown yang rapi. \n" +
         "PENTING: \n" +
-        "1. JANGAN gunakan paragraf panjang. Gunakan format POIN-POIN (Bullet Points) agar mudah dibaca.\n" +
-        "2. Jelaskan logika utamanya saja secara ringkas.\n" +
-        "3. Jika ada potensi bug/error, sebutkan di bagian akhir dengan peringatan emoji ⚠️.";
+        "- Jika user memberikan 'Bagian Kode Terpilih', output kode refactor HANYA untuk bagian itu saja (jangan tulis ulang seluruh file).\n" +
+        "- Letakkan kode final dalam Code Block (```) agar bisa di-apply otomatis.\n" +
+        "- Jelaskan perubahan poin per poin.";
+      } else {
+        systemPrompt = "Anda adalah Asisten Coding (Indonesian). Tugas: Jelaskan kode ini dengan gaya bahasa yang natural, profesional, dan terstruktur seperti dokumentasi resmi. \n" +
+        "Aturan Format Penting: \n" +
+        `1. AWALI jawaban dengan Header H3 (###) yang bertuliskan: "Analisis ${isSelection ? 'Bagian Kode Terpilih' : 'Keseluruhan File'}".\n` +
+        (isSelection ? `2. TULIS ULANG kode yang dipilih tersebut dalam Markdown Code Block (bahasa: ${language}) tepat di bawah Header agar user tahu apa yang dijelaskan.\n` : "") +
+        "3. Gunakan **Numbered List** (1., 2., 3.) WAJIB digunakan ketika menjelaskan **Langkah-langkah**, **Alur Logika Berurutan**, atau **Urutan Eksekusi Program**.\n" +
+        "4. Gunakan **Bullet Points** (-) hanya untuk mendaftar fitur, properti, opsi, atau item yang tidak memiliki urutan waktu.\n" +
+        "5. Gunakan **Heading** (###) untuk memisahkan topik pembahasan.\n" +
+        "6. Gunakan **Inline Code** (`...`) untuk menyorot nama variabel, fungsi, atau sintaks penting.\n" +
+        "7. Berikan penjelasan singkat (1-2 kalimat) di awal sebelum masuk ke poin-poin agar lebih mengalir.\n" +
+        "8. Jika ada bug/warning, buat section khusus '⚠️ Potensi Bug'.";
       }
 
       const response = await fetch(ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: "gemini/gemini-2.0-flash-lite",
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: `Language: ${language}\n\nCode Snippet:\n${codeToAnalyze}` }
+            { role: "user", content: `Context Scope: ${scopeLabel}\nLanguage: ${language}\n\nCode to Analyze:\n${codeToAnalyze}` }
           ],
           temperature: 0.3,
         })
@@ -228,10 +301,10 @@ function App() {
         }
       }
     } catch (error: any) {
-      setAiResponse(`Error: ${error.message}`);
+      setAiResponse(`### ❌ Error\n\nTerjadi kesalahan saat menghubungi AI:\n\n\`${error.message}\``);
       setStatus("AI Failed");
     } finally {
-      setIsAiLoading(false);
+      setAiProcessingState(null);
     }
   };
 
@@ -244,9 +317,7 @@ function App() {
   return (
     <div className="flex h-screen w-full bg-[#09090b] text-zinc-300 overflow-hidden font-sans selection:bg-indigo-500/30">
       
-      {/* SIDEBAR (LEFT) */}
       <div className="w-72 shrink-0 flex flex-col glass-sidebar z-20">
-        {/* Brand */}
         <div className="h-14 flex items-center px-4 border-b border-white/[0.08]">
             <div className="w-6 h-6 rounded bg-indigo-600 flex items-center justify-center mr-3 shadow-[0_0_15px_rgba(79,70,229,0.5)]">
                 <span className="font-bold text-white text-xs">D</span>
@@ -255,7 +326,6 @@ function App() {
             <span className="text-[10px] ml-auto px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">v1.0</span>
         </div>
 
-        {/* Search & Actions */}
         <div className="p-3 space-y-2">
              <button 
                 onClick={resetForm}
@@ -278,7 +348,6 @@ function App() {
              </div>
         </div>
 
-        {/* Snippet List */}
         <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-1 custom-scrollbar">
             {filteredSnippets.length === 0 ? (
                 <div className="text-center py-10 text-zinc-600 text-xs">No snippets found</div>
@@ -303,7 +372,6 @@ function App() {
                              ))}
                         </div>
                         
-                        {/* Hover Actions */}
                         <div className="absolute right-2 top-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-[#09090b]/80 backdrop-blur rounded pl-1">
                              <button onClick={(e) => deleteSnippet(item.id, e)} className="p-1 hover:text-red-400 text-zinc-500"><Icons.Trash /></button>
                         </div>
@@ -312,7 +380,6 @@ function App() {
             )}
         </div>
 
-        {/* User / Footer */}
         <div className="h-12 border-t border-white/[0.08] flex items-center justify-between px-4 bg-zinc-900/30">
             <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${status === 'Error loading data' ? 'bg-red-500' : 'bg-emerald-500'} animate-pulse`}></div>
@@ -324,10 +391,8 @@ function App() {
         </div>
       </div>
 
-      {/* MAIN CONTENT (RIGHT) */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#0c0e12] relative">
         
-        {/* Editor Toolbar */}
         <div className="h-14 border-b border-white/[0.08] flex items-center justify-between px-6 bg-[#0c0e12]/80 backdrop-blur z-10">
              <div className="flex items-center gap-4 flex-1">
                 <input 
@@ -359,20 +424,20 @@ function App() {
 
                 <button 
                     onClick={() => askAI('explain')} 
-                    disabled={isAiLoading}
+                    disabled={!!aiProcessingState}
                     className="flex items-center gap-2 text-xs font-medium text-zinc-400 hover:text-indigo-400 px-3 py-1.5 rounded-md hover:bg-indigo-900/10 border border-transparent hover:border-indigo-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {isAiLoading ? <Icons.Spinner /> : <Icons.Brain />}
-                    <span>{isAiLoading ? "Thinking..." : "Explain"}</span>
+                    {aiProcessingState === 'explain' ? <Icons.Spinner /> : <Icons.Brain />}
+                    <span>{aiProcessingState === 'explain' ? "Thinking..." : "Explain"}</span>
                 </button>
 
                 <button 
                     onClick={() => askAI('refactor')} 
-                    disabled={isAiLoading}
+                    disabled={!!aiProcessingState}
                     className="flex items-center gap-2 text-xs font-medium text-zinc-400 hover:text-emerald-400 px-3 py-1.5 rounded-md hover:bg-emerald-900/10 border border-transparent hover:border-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {isAiLoading ? <Icons.Spinner /> : <Icons.Magic />}
-                    <span>{isAiLoading ? "Fixing..." : "Refactor"}</span>
+                    {aiProcessingState === 'refactor' ? <Icons.Spinner /> : <Icons.Magic />}
+                    <span>{aiProcessingState === 'refactor' ? "Fixing..." : "Refactor"}</span>
                 </button>
                 
                 <button 
@@ -384,7 +449,6 @@ function App() {
              </div>
         </div>
 
-        {/* Inputs Area (Tags) */}
         <div className="px-6 py-3 border-b border-white/[0.04]">
              <input 
                 type="text" 
@@ -395,7 +459,6 @@ function App() {
              />
         </div>
 
-        {/* Monaco Editor */}
         <div className="flex-1 relative">
             <Editor
                 height="100%"
@@ -425,25 +488,41 @@ function App() {
             />
         </div>
 
-        {/* AI Response Panel (Collapsible Overlay) */}
         {(aiResponse || suggestedCode) && (
-            <div className="absolute bottom-6 right-6 w-96 max-h-[80%] bg-[#121216] border border-indigo-500/20 shadow-2xl rounded-xl flex flex-col overflow-hidden animate-in slide-in-from-right-5 fade-in z-30">
-                <div className="px-4 py-3 border-b border-white/5 bg-indigo-900/10 flex justify-between items-center">
+            <div className="absolute bottom-6 right-6 w-[30rem] max-h-[85%] bg-[#121216] border border-indigo-500/20 shadow-2xl rounded-xl flex flex-col overflow-hidden animate-in slide-in-from-right-5 fade-in z-30 ring-1 ring-white/5">
+                <div className="px-4 py-3 border-b border-white/5 bg-indigo-900/10 flex justify-between items-center shrink-0">
                     <span className="text-xs font-bold text-indigo-400 flex items-center gap-2"><Icons.Brain /> AI ASSISTANT</span>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                         {suggestedCode && (
-                            <button onClick={() => { setCode(suggestedCode); setSuggestedCode(""); }} className="text-[10px] bg-emerald-600 px-2 py-0.5 rounded text-white font-bold">Apply</button>
+                            <button 
+                                onClick={handleApplyCode} 
+                                className="text-[10px] bg-emerald-600 px-2 py-1 rounded text-white font-bold hover:bg-emerald-500 transition-colors mr-2"
+                            >
+                                Apply Fix
+                            </button>
                         )}
-                        <button onClick={() => setAiResponse("")} className="text-zinc-500 hover:text-white">&times;</button>
+                        <button 
+                            onClick={() => {
+                                setAiResponse("");
+                                setSuggestedCode("");
+                                setLastSelectionRange(null);
+                            }} 
+                            className="text-zinc-400 hover:text-white hover:bg-white/10 p-1 rounded transition-all"
+                            title="Close"
+                        >
+                            <Icons.Close />
+                        </button>
                     </div>
                 </div>
-                <div className="p-4 overflow-y-auto text-sm text-zinc-300 leading-relaxed custom-scrollbar">
-                    <ReactMarkdown>{aiResponse}</ReactMarkdown>
+                
+                <div className="p-5 overflow-y-auto custom-scrollbar">
+                    <ReactMarkdown components={MarkdownComponents}>
+                        {aiResponse}
+                    </ReactMarkdown>
                 </div>
             </div>
         )}
 
-        {/* Config Modal */}
         {showAiConfig && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in">
                 <div className="bg-[#09090b] w-96 p-6 rounded-xl border border-zinc-800 shadow-2xl">
